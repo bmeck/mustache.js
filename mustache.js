@@ -2,8 +2,16 @@
   mustache.js — Logic-less templates in JavaScript
 
   See http://mustache.github.com/ for more info.
-*/
 
+  @modified
+    * looping can now do slices w/ [x..y] (akin to array.slice). 0 indexed, both sides are inclusive
+      , [x..] is from x to the end
+      , [..x] is from the start to x
+      , [x] is just the element at x
+      , negatives are allowed
+    * {{|}} is the length of a loop
+    * {{@}} is the index of a loop)
+*/
 var Mustache = function() {
   var Renderer = function() {};
 
@@ -66,7 +74,7 @@ var Mustache = function() {
             this.ctag);
       return template.replace(regex, function(match, pragma, options) {
         if(!that.pragmas_implemented[pragma]) {
-          throw({message: 
+          throw({message:
             "This implementation of mustache doesn't understand the '" +
             pragma + "' pragma"});
         }
@@ -104,12 +112,12 @@ var Mustache = function() {
 
       var that = this;
       // CSW - Added "+?" so it finds the tighest bound, not the widest
-      var regex = new RegExp(this.otag + "(\\^|\\#)\\s*(.+)\\s*" + this.ctag +
+      var regex = new RegExp(this.otag + "(\\^|\\#)\\s*([^\\[]+)\\s*(?:\\[\\s*([-]?\\d+)?(\\s*\\.\\.\\s*([-]?\\d+)?)?\\s*\\]\\s*)?" + this.ctag +
               "\n*([\\s\\S]+?)" + this.otag + "\\/\\s*\\2\\s*" + this.ctag +
               "\\s*", "mg");
 
       // for each {{#foo}}{{/foo}} section do...
-      return template.replace(regex, function(match, type, name, content) {
+      return template.replace(regex, function(match, type, name, slice_start, slice_continuation, slice_end, content) {
         var value = that.find(name, context);
         if(type == "^") { // inverted section
           if(!value || that.is_array(value) && value.length === 0) {
@@ -120,8 +128,19 @@ var Mustache = function() {
           }
         } else if(type == "#") { // normal section
           if(that.is_array(value)) { // Enumerable, Let's loop!
-            return that.map(value, function(row) {
-              return that.render(content, that.create_context(row),
+            if (slice_start) {
+              if (slice_end) {
+                value = value.slice(slice_start, slice_end == -1 ? value.length-1 : Number(slice_end)+1);
+              }
+              else {
+                value = slice_continuation ? value.slice(slice_start) : value.slice(slice_start,slice_start == -1 ? value.length : Number(slice_start)+1)
+              }
+            }
+            else if (slice_continuation && slice_end) {
+                value = value.slice(0, slice_end == -1 ? value.length-1 : Number(slice_end)+1);
+            }
+            return that.map(value, function(row,index,arr) {
+              return that.render(content, that.create_context(row,index,arr,context),
                 partials, true);
             }).join("");
           } else if(that.is_object(value)) { // Object, Use it as subcontext!
@@ -257,16 +276,23 @@ var Mustache = function() {
     },
 
     // by @langalex, support for arrays of strings
-    create_context: function(_context) {
+    create_context: function(_context,_index,_arr,_inherits) {
       if(this.is_object(_context)) {
         return _context;
       } else {
         var iterator = ".";
+        var index = "@";
+        var length = "|";
         if(this.pragmas["IMPLICIT-ITERATOR"]) {
           iterator = this.pragmas["IMPLICIT-ITERATOR"].iterator;
         }
         var ctx = {};
+        if(_inherits) for(var property in _inherits) {
+          ctx[property] = _inherits[property]
+        }
         ctx[iterator] = _context;
+        ctx[index] = _index;
+        ctx[length] = _arr.length;
         return ctx;
       }
     },
@@ -296,7 +322,8 @@ var Mustache = function() {
         var r = [];
         var l = array.length;
         for(var i = 0; i < l; i++) {
-          r.push(fn(array[i]));
+          //index is important - bmeck
+          r.push(fn(array[i],i,array));
         }
         return r;
       }
@@ -322,3 +349,5 @@ var Mustache = function() {
     }
   });
 }();
+
+if(exports && module) {module.exports = Mustache}
