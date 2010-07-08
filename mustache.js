@@ -113,8 +113,8 @@ var Mustache = function() {
       var that = this;
       // CSW - Added "+?" so it finds the tighest bound, not the widest
       var regex = new RegExp(this.otag + "(\\^|\\#)\\s*([^\\[]+)\\s*(?:\\[\\s*([-]?\\d+)?(\\s*\\.\\.\\s*([-]?\\d+)?)?\\s*\\]\\s*)?" + this.ctag +
-              "\n*([\\s\\S]+?)" + this.otag + "\\/\\s*\\2\\s*" + this.ctag +
-              "\\s*", "mg");
+              "([\\s\\S]+?)" + this.otag + "\\/\\s*\\2\\s*" + this.ctag
+              , "mg");
 
       // for each {{#foo}}{{/foo}} section do...
       return template.replace(regex, function(match, type, name, slice_start, slice_continuation, slice_end, content) {
@@ -189,7 +189,7 @@ var Mustache = function() {
           return that.escape(that.find(name, context));
         }
       };
-      var lines = template.split("\n");
+      var lines = [template]//template.split("\n");
       for(var i = 0; i < lines.length; i++) {
         lines[i] = lines[i].replace(regex, tag_replace_callback, this);
         if(!in_recursion) {
